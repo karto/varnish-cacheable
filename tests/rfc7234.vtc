@@ -1,0 +1,49 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "rfc7234 - "
+# https://tools.ietf.org/html/rfc7234#section-5.2.2.2
+
+server s1 {
+    rxreq
+    txresp -hdr "Cache-Control: max-age=1"
+
+    rxreq
+    txresp -hdr "Cache-Control: max-age=1"
+
+    rxreq
+    txresp -hdr "Cache-Control: max-age=1"
+
+} -start
+
+varnish v1 -arg "-p default_ttl=119" -arg "-p default_grace=59" -arg "-p default_keep=599" -vcl+backend {
+    include "${pwd}/rfc7234.vcl";
+} -start
+
+client c1 {
+    txreq -url "/"
+    rxresp
+    expect resp.status == 200
+    #expect resp.http.X-Cache == "MISS"
+    #expect resp.http.X-Cacheable == "YES:"
+    
+    txreq -url "/"
+    rxresp
+    expect resp.status == 200
+    #expect resp.http.X-Cache == "MISS"
+    #expect resp.http.X-Cacheable == "YES:"
+    
+    delay 1
+    
+    txreq -url "/"
+    rxresp
+    expect resp.status == 200
+    #expect resp.http.X-Cache == "HIT"
+    #expect resp.http.X-Cacheable == "YES:"
+    
+} -run
+

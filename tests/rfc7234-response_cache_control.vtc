@@ -1,0 +1,71 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "rfc7234 - 5.2.2.  Response Cache-Control Directives"
+
+# 5.2.2.  Response Cache-Control Directives
+
+server s1 {
+    rxreq
+    txresp
+} -start
+
+varnish v1 -arg "-p default_ttl=119" -arg "-p default_grace=59" -arg "-p default_keep=599" -vcl+backend {
+    include "${pwd}/rfc7234.vcl";
+} -start
+
+client c1 {
+    txreq -url "/" -hdr "X-Miss: true"
+    rxresp
+    
+    txreq -url "/" -hdr "X-Miss: true" -hdr "X-Backend: bad"
+    rxresp
+    
+    txreq -url "/" -hdr "X-Miss: true" -hdr "X-Backend: sick"
+    rxresp
+    
+} -run
+
+
+# 5.2.2.1.  must-revalidate  https://tools.ietf.org/html/rfc7234#section-5.2.2.1
+server s1 {
+    rxreq
+    txresp -hdr "Cache-Control: must-revalidate, max-age=1"
+
+    rxreq
+    txresp -hdr "Cache-Control: must-revalidate, max-age=1"
+} -start
+client c1 {
+    txreq -url "/must-revalidate"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Cache == "MISS"
+    expect resp.http.X-Cacheable == "YES:default=119s"
+    
+    delay 1.1
+    
+    txreq -url "/must-revalidate"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Cache == "MISS"
+    expect resp.http.X-Cacheable == "YES:default=119s"
+    
+    txreq -url "/must-revalidate" -hdr "X-Backend: sick"
+    rxresp
+    expect resp.status == 504
+    expect resp.http.X-Cache == "MISS"
+    expect resp.http.X-Cacheable == "NO:synth"
+    
+    txreq -url "/must-revalidate" -hdr "X-Backend: sick"
+    rxresp
+    expect resp.status == 504
+    expect resp.http.X-Cache == "MISS"
+    expect resp.http.X-Cacheable == "NO:error"
+    
+    
+} -run
+

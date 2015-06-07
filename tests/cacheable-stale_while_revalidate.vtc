@@ -1,0 +1,44 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "cacheable - Basic"
+
+server s1 {
+    rxreq
+    txresp -hdr "Cache-Control: max-age=0, stale-while-revalidate=101"
+} -start
+
+varnish v1 -arg "-p default_ttl=119" -arg "-p default_grace=59" -arg "-p default_keep=599" -vcl+backend {
+    import std;
+    import header;
+    include "${pwd}/tracing.vcl";
+    include "${pwd}/../cacheable-client.vcl";
+    include "${pwd}/../cacheable-backend.vcl";
+    include "${pwd}/../cacheable.vcl";
+    include "${pwd}/cacheable.vcl";
+} -start
+
+client c1 {
+    txreq -url "/"
+    rxresp
+    expect resp.status == 200
+    expect resp.http.X-Varnish == "1001"
+    expect resp.http.X-Cacheable == "YES;max-age=0;swr;grace=101.000"
+    expect resp.http.X-Caching == "0.000/101.000/599.000/false"
+
+} -run
+
+## Give varnish a chance to update stats
+#delay .1
+#
+#varnish v1 -expect sess_conn == 2
+#varnish v1 -expect cache_hit == 1
+#varnish v1 -expect cache_miss == 1
+#varnish v1 -expect client_req == 2
+#varnish v1 -expect s_sess == 2
+#varnish v1 -expect s_req == 2
+#varnish v1 -expect s_fetch == 1

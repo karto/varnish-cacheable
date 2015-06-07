@@ -1,0 +1,49 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "varnish - Can cache POST"
+
+server s1 {
+    rxreq
+    expect req.method == POST
+    txresp -hdr "Cache-Control: public,max-age=10"
+    
+} -start
+
+varnish v1 -vcl+backend {
+    import std;
+    include "${pwd}/tracing.vcl";
+    
+    sub vcl_recv {
+        return (hash);
+    }
+    sub vcl_pass {
+    }
+    sub vcl_hash {
+        hash_data(req.url);
+        return (lookup);
+    }
+    sub vcl_miss {
+        if ("POST" == req.method) { return (pass); }
+    }
+    sub vcl_backend_response {
+        set beresp.ttl = 10s;
+        set beresp.uncacheable = false;
+        set beresp.http.method = req.method;
+        // should vary on req.method but only if POST == bereq.method and beresp.http.Content-Locaton != bereq.url
+        return (deliver);
+    }
+    
+    
+} -start
+
+client c1 {
+    txreq -req "POST" -url "/"
+    rxresp
+    
+} -run
+

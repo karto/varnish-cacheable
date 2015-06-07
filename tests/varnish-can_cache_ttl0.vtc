@@ -1,0 +1,56 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "varnish - Can cache POST"
+
+server s1 {
+    rxreq
+    txresp
+    
+    rxreq
+    txresp
+    
+} -start
+
+varnish v1 -vcl+backend {
+    import std;
+    import header;
+    include "${pwd}/tracing.vcl";
+    
+    sub vcl_recv {
+    }
+    sub vcl_pass {
+    }
+    sub vcl_hash {
+    }
+    sub vcl_hit {
+        
+    }
+    sub vcl_miss {
+    }
+    sub vcl_backend_response {
+        #set beresp.http.Age = "1";
+        #set beresp.ttl = 1s;
+        set beresp.ttl = 0.001s;
+        set beresp.grace = 10s;
+        return (deliver);
+    }
+    
+    
+} -start
+
+client c1 {
+    txreq -url "/"
+    rxresp
+    
+    delay 0.5
+    
+    txreq -url "/"
+    rxresp
+    
+} -run
+

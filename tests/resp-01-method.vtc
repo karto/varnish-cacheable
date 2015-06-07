@@ -1,0 +1,47 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "rfc7234 - resp - method"
+
+server s1 {
+    rxreq
+    txresp
+    
+    rxreq
+    txresp
+    
+    rxreq
+    txresp
+    
+    rxreq
+    txresp
+    
+} -start
+
+varnish v1 -arg "-p default_ttl=119" -arg "-p default_grace=3599" -arg "-p default_keep=86399" -vcl+backend {
+    include "${pwd}/rfc7234.vcl";
+} -start
+
+client c1 {
+    txreq -req "GET" -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=119s"
+    
+    txreq -req "HEAD" -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=119s"
+    
+    txreq -req "POST" -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=119s"
+    
+    txreq -req "OPTIONS" -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "NO:method"
+    
+} -run
+
