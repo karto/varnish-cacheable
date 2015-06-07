@@ -1,0 +1,47 @@
+#
+# Test
+#
+# Author Karto Martin <source@karto.net>
+# Copyright (c) 2015 Karto Martin. All Right Reserved.
+# License The MIT License
+#
+varnishtest "rfc7234 - resp - default"
+
+server s1 {
+    rxreq
+    txresp
+    
+    rxreq
+    txresp -hdr "Since-Modified: 60s"
+    
+    rxreq
+    txresp -hdr "Since-Modified: 100000s"
+    
+    rxreq
+    txresp -hdr "Since-Modified: 1000000s"
+    
+} -start
+
+varnish v1 -arg "-i rfc7234_vtc" -arg "-p default_ttl=119" -arg "-p default_grace=3599" -arg "-p default_keep=86399" -vcl+backend {
+    include "${pwd}/rfc7234.vcl";
+} -start
+
+client c1 {
+    txreq -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=119s"
+    
+    txreq -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=10s<6s<1d"
+    
+    txreq -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=10s<10000s<1d"
+    
+    txreq -url "/" -hdr "X-Miss: true"
+    rxresp
+    expect resp.http.X-Cacheable == "YES:default=10s<100000s<1d"
+    
+} -run
+
