@@ -50,9 +50,9 @@ sub cacheable_backend_response_cacheable {
     #    in request or response header fields, and
     # rfc7234   5.2.1.5.  no-store    https://tools.ietf.org/html/rfc7234#section-5.2.1.5
     elsif (bereq.http.Cache-Control ~ "(?i)(^|,)\s*no-store\s*(,|$)") {
-        set beresp.http.X-Cacheable = "H4P;req;no-store";
+        set beresp.http.X-Cacheable = "NO;req;no-store";
         set beresp.uncacheable = true;
-        set beresp.ttl = 119s; // Hit for pass
+        set beresp.ttl = 0s; // No hit for pass
     }
     # rfc7234   5.2.2.3.  no-store    https://tools.ietf.org/html/rfc7234#section-5.2.2.3
     elsif (beresp.http.Cache-Control ~ "(?i)(^|,)\s*no-store\s*(,|$)") {
@@ -86,14 +86,13 @@ sub cacheable_backend_response_cacheable {
     # freshness_lifetime) of a response by using the first match of the
     # following:
 
-    #    o  If the cache is varnish and the v-maxage response directive
+    #    o  If the cache is varnish and the dr-maxage response directive
     #       is present, use its value, or
     #    *  contains a dr-maxage=ttl[+grace] response directive (custom varnish ttl and grace)
     elsif (beresp.http.Cache-Control ~ "(?i)(^|,)\s*dr-maxage=\d+(\+\d+)?\s*(,|$)") {
         set beresp.http.X-Cacheable = "YES;"+regsub(beresp.http.Cache-Control, "(?i)^(?:.*,)?\s*(dr-maxage=\d+(?:\+\d+)?)\s*(?:,.*)?$", "\1");
         set beresp.ttl = std.duration(regsub(beresp.http.Cache-Control, "(?i)^(?:.*,)?\s*dr-maxage=(\d+)(?:\+\d+)?\s*(?:,.*)?$", "\1")+"s", 0s);
         if (beresp.http.Cache-Control ~ "(?i)(^|,)\s*dr-maxage=\d+\+\d+\s*(,|$)") {
-            set beresp.http.X-Cacheable = beresp.http.X-Cacheable+";dr;grace="+std.duration(beresp.http.VAR-stale-if-error, 0s);
             set beresp.grace = std.duration(regsub(beresp.http.Cache-Control, "(?i)^(?:.*,)?\s*dr-maxage=\d+\+(\d+)\s*(?:,.*)?$", "\1")+"s", 0s);
         }
     }
@@ -229,7 +228,9 @@ sub cacheable_backend_response_cacheable {
         set beresp.uncacheable = true;
         set beresp.ttl = 0s; // No hit for pass
     }
+    #End elseif
     
+    ####################################################
     # Set grace
     if (beresp.http.Cache-Control !~ "(?i)(^|,)\s*dr-maxage=\d+\+\d+\s*(,|$)") {
 
